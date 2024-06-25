@@ -1,4 +1,4 @@
-# http-request-relay
+# HTTP and HTTPS Request Relay
 Send and receive HTTP and HTTPS requests to target server using sockets.
 Supports all content types and request methods.
 
