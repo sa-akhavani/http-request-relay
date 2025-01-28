@@ -1,8 +1,12 @@
 import socket
 import ssl
+import sys
+import os
+
+# from hostnames import target_urls
 
 _BUFFER_SIZE = 4096 # 4 KB
-_TIMEOUT = 4 # 4 seconds
+_TIMEOUT = 20 # 20 seconds (Change if you receive empty response)
 
 class Relay:
     def __init__(self, host, port, use_ssl=False):
@@ -55,11 +59,51 @@ class Relay:
 
         return response
 
+def read_requests_from_file(filename):
+    """
+    Read raw HTTP requests from a file where each line is a Python byte object.
+    Requests in the file have to be in Byte-Object format. b'''<request>'''
+    """
+    if not os.path.isfile(filename):
+        print(f"Error: File '{filename}' does not exist.")
+        return []
 
-# Example usage
-if __name__ == '__main__':
-    relay = Relay('example.com', 443, use_ssl=True)
-    # get_request = b'GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n'
-    post_request = b'POST / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: 16\r\n\r\n{"key": "value"}'
-    response = relay.forward_request(post_request)
-    print(response.decode())
+    with open(filename, 'r') as file:
+        requests = file.readlines()
+
+    # Parse each line into a Python bytes object
+    return [eval(req.strip()) for req in requests if req.strip()]
+
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python script.py <filename>")
+        sys.exit(1)
+
+    filename = sys.argv[1]
+
+
+    relay = Relay(host="localhost", port=12345, use_ssl=False)
+
+    # Read the requests from the file
+    requests = read_requests_from_file(filename)
+
+    if not requests:
+        print("No requests to send. Exiting.")
+        sys.exit(0)
+
+    # Send each request sequentially
+    for i, request in enumerate(requests, 1):
+        print(f"Sending request {i}:")
+        print(request)
+
+        response = relay.forward_request(request)
+
+        if response:
+            print("Response:")
+            print(response.decode())
+        else:
+            print("No response received.")
+        print("##########################")
+
