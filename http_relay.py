@@ -2,6 +2,7 @@ import socket
 import ssl
 import sys
 import os
+import argparse
 
 # from hostnames import target_urls
 
@@ -59,7 +60,8 @@ class Relay:
 
         return response
 
-def read_requests_from_file(filename):
+
+def read_requests_from_file(filename) -> list[bytes]:
     """
     Read raw HTTP requests from a file where each line is a Python byte object.
     Requests in the file have to be in Byte-Object format. b'''<request>'''
@@ -75,19 +77,49 @@ def read_requests_from_file(filename):
     return [eval(req.strip()) for req in requests if req.strip()]
 
 
+def parse_arguments() -> tuple[str, int, str, bool]:
+    """
+    Parses command-line arguments, supporting both positional and optional formats.
+    Returns the parsed host, port, request file, and SSL flag for HTTPS connections.
+    """
+    parser = argparse.ArgumentParser(
+        # description="Send HTTP requests from a file through a relay using sockets.",
+        usage="\npython http_relay.py [host] [port] [requests_filename] [-s (for ssl)]\n"
+              "or\n"
+              "python http_relay.py -H <host> -p <port> -r <requests_filename> [-s (for ssl)]"
+    )
+
+    # Optional arguments (with --flags)
+    parser.add_argument("-H", "--host", help="Target host (e.g., example.com)")
+    parser.add_argument("-p", "--port", type=int, help="Target port (e.g., 80 or 443)")
+    parser.add_argument("-r", "--request", help="File containing HTTP requests in byte object format (b'''...''')")
+    parser.add_argument("-s", "--ssl", action="store_true", help="Use SSL for connections (optional)")
+
+    # Positional arguments (without --flags)
+    parser.add_argument("host_positional", nargs="?", help=argparse.SUPPRESS)
+    parser.add_argument("port_positional", nargs="?", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("request_positional", nargs="?", help=argparse.SUPPRESS)
+
+    args = parser.parse_args()
+
+    # Resolve conflicts between positional and optional arguments
+    host = args.host or args.host_positional
+    port = args.port or args.port_positional
+    request_file = args.request or args.request_positional
+
+    # Validate required fields
+    if not host or not port or not request_file:
+        parser.print_help()
+        sys.exit(0)
+
+    return host, port, request_file, args.ssl
+
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <filename>")
-        sys.exit(1)
 
-    filename = sys.argv[1]
-
-
-    relay = Relay(host="localhost", port=12345, use_ssl=False)
-
-    # Read the requests from the file
-    requests = read_requests_from_file(filename)
+    host, port, request_file, use_ssl = parse_arguments()
+    relay = Relay(host=host, port=port, use_ssl=use_ssl)
+    requests = read_requests_from_file(request_file)
 
     if not requests:
         print("No requests to send. Exiting.")
